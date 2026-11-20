@@ -1,0 +1,377 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>DeskMonitor 使用说明（进阶）</title><style>
+body{font:-apple-system,15px/1.75 "PingFang SC",sans-serif;max-width:820px;margin:40px auto;padding:0 24px;color:#1f2328;background:#fff}
+h1{font-size:26px;border-bottom:2px solid #e5e7eb;padding-bottom:10px;margin-top:38px}
+h2{font-size:20px;margin-top:32px;border-left:4px solid #3b82f6;padding-left:10px}
+h3{font-size:16px;margin-top:24px}
+code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:13px}
+pre{background:#1f2328;color:#e6edf3;padding:14px 16px;border-radius:8px;overflow-x:auto}
+pre code{background:none;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left}
+th{background:#f9fafb}
+li{margin:4px 0}
+</style></head><body><h1>DeskMonitor 使用说明（进阶版）</h1>
+
+<p>&gt; 面向：知道 CPU / 内存的基本概念，想知道**每个数字具体怎么算出来**的人。</p>
+<p>&gt;</p>
+<p>&gt; 只想看懂界面的话，看 [使用说明.md](使用说明.md)。</p>
+
+<p>---</p>
+
+<h2>0. 数据来源总述</h2>
+
+<p>全部来自 macOS 公开接口，**没有私有 API、不需要 root、不安装内核扩展、不联网**：</p>
+
+<table>
+<tr><th>框架</th><th>用途</th></tr>
+<tr><td>`mach`（`host_processor_info` / `host_statistics64`）</td><td>CPU、内存</td></tr>
+<tr><td>`sysctl`（`vm.swapusage` / `NET_RT_IFLIST2` / `hw.perflevel*`）</td><td>交换、网络、硬件信息</td></tr>
+<tr><td>`IOKit`（`IOBlockStorageDriver` / `IOAccelerator`）</td><td>磁盘 I/O、GPU</td></tr>
+<tr><td>`libproc`（`proc_listallpids` / `proc_pidpath` / `proc_pidinfo`）</td><td>进程</td></tr>
+<tr><td>`AppKit`（`NSWorkspace`）</td><td>应用清单与图标</td></tr>
+</table>
+
+<p>采样在独立的串行队列（`qos: .utility`）上执行，结果回到主线程刷新界面。</p>
+
+<p>---</p>
+
+<h2>1. 面板项与口径对照</h2>
+
+<table>
+<tr><th>面板显示</th><th>含义</th><th>单位</th></tr>
+<tr><td>CPU 大数字</td><td>全部逻辑核的平均占用率</td><td>0–100%</td></tr>
+<tr><td>CPU 柱状图</td><td>每个逻辑核的占用率</td><td>0–100%（单核）</td></tr>
+<tr><td>用户 / 系统 / 空闲</td><td>CPU 时间的三类分布</td><td>三者合计 100%</td></tr>
+<tr><td>内存「应用」</td><td>匿名页中非 purgeable 部分</td><td>字节</td></tr>
+<tr><td>内存「联动」</td><td>不可换出、不可压缩的页</td><td>字节</td></tr>
+<tr><td>内存「压缩」</td><td>压缩器占用的物理内存</td><td>字节</td></tr>
+<tr><td>内存「缓存」</td><td>文件缓存，可随时丢弃</td><td>字节</td></tr>
+<tr><td>交换</td><td>已写入磁盘的量</td><td>字节</td></tr>
+<tr><td>网络 ↓ / ↑</td><td>物理网卡收发速率</td><td>字节/秒</td></tr>
+<tr><td>磁盘 读 / 写</td><td>块设备读写速率</td><td>字节/秒</td></tr>
+<tr><td>GPU</td><td>设备利用率</td><td>0–100%</td></tr>
+<tr><td>进程 CPU</td><td>该 App 所有进程的 CPU 时间 ÷ 墙钟时间</td><td>% （1 = 1 核）</td></tr>
+<tr><td>进程 内存</td><td>该 App 所有进程 RSS 之和</td><td>字节</td></tr>
+</table>
+
+<p>---</p>
+
+<h2>2. CPU</h2>
+
+<h3>2.1 总量</h3>
+
+<pre><code>
+host_processor_info(mach_host_self(),
+                    PROCESSOR_CPU_LOAD_INFO,
+                    &amp;count, &amp;info, &amp;infoCount);
+</code></pre>
+
+<p>每个逻辑核返回一个 `processor_cpu_load_info`，内含 4 个 `UInt32` tick 计数器：</p>
+
+<pre><code>
+cpu_ticks[0] = USER   cpu_ticks[1] = SYSTEM
+cpu_ticks[2] = IDLE   cpu_ticks[3] = NICE
+</code></pre>
+
+<p>这些是**从开机起的累计 tick 数**，所以要保存上一次的值做差分：</p>
+
+<pre><code>
+busy  = Δuser + Δsystem + Δnice
+total = busy + Δidle
+usage = busy / total
+</code></pre>
+
+<p>两个细节：</p>
+
+<ul><li>**计数器是 `UInt32`，会回绕**，所以差值必须用 `&amp;-`（wrapping 减法），不能用普通减法。</li>
+<li>首次采样没有基准，直接返回 0 并记下基准值，第二次才是真实数据。</li>
+</ul>
+<h3>2.2 每核</h3>
+
+<p>同一份数组按核切片，逐核套用上面的公式即可。柱状图高度 = `usage × 30pt`。</p>
+
+<h3>2.3 核心编号与 P/E 顺序</h3>
+
+<p>柱状图下方的编号 `1..N` 就是内核返回的数组下标 `0..N-1`。</p>
+
+<p>**关键：Apple Silicon 上能效核排在前面，性能核排在后面。**</p>
+
+<p>这不是猜的，是实测出来的。验证方法：</p>
+
+<pre><code>
+# 起 4 个单线程满载进程
+for i in 1 2 3 4; do (while :; do :; done) &amp; done
+# 观察哪些核被打满
+./DeskMonitor --probe
+</code></pre>
+
+<p>结果：只有**最后 4 个**核到了 99–100%，前 6 个维持在 20–50%。</p>
+
+<p>因此：</p>
+
+<pre><code>
+编号 1–6   → 能效核 E（Efficiency）
+编号 7–10  → 性能核 P（Performance）
+</code></pre>
+
+<p>性能核数量来自 `sysctl hw.perflevel0.logicalcpu`（本机 = 4），能效核是 `hw.perflevel1.logicalcpu`（= 6）。</p>
+
+<p>代码里做了防御：如果两个 perflevel 之和不等于总核数（例如 Intel 机器上 perflevel 不存在），就退化成单色柱状图，不做任何 P/E 假设。</p>
+
+<h3>2.4 `4P + 6E` 是什么意思</h3>
+
+<table>
+<tr><th>记号</th><th>含义</th><th>本机数量</th></tr>
+<tr><td>P</td><td>Performance，性能核。频率高、单核强、耗电</td><td>4</td></tr>
+<tr><td>E</td><td>Efficiency，能效核。频率低、省电、适合后台</td><td>6</td></tr>
+</table>
+
+<p>调度由 macOS 内核决定，**App 无法指定**某个线程跑在哪类核上。系统会让前台重活优先落到 P 核，后台任务放到 E 核。</p>
+
+<p>这就是为什么平时大部分柱子很矮：E 核在干轻活，P 核大部分时间睡着。</p>
+
+<p>---</p>
+
+<h2>3. 内存</h2>
+
+<h3>3.1 数据源</h3>
+
+<pre><code>
+host_statistics64(mach_host_self(), HOST_VM_INFO64, ...);
+</code></pre>
+
+<p>拿到 `vm_statistics64`，页大小在 Apple Silicon 上是 **16 KB**（`vm_kernel_page_size`）。</p>
+
+<h3>3.2 四个量的计算</h3>
+
+<table>
+<tr><th>显示</th><th>公式</th><th>对应字段</th></tr>
+<tr><td>应用</td><td>`(internal_page_count − purgeable_count) × pageSize`</td><td>匿名、非可清除</td></tr>
+<tr><td>联动</td><td>`wire_count × pageSize`</td><td>内核锁定</td></tr>
+<tr><td>压缩</td><td>`compressor_page_count × pageSize`</td><td>压缩器占用</td></tr>
+<tr><td>缓存</td><td>`(external_page_count + purgeable_count) × pageSize`</td><td>文件页</td></tr>
+</table>
+
+<p>其中**缓存**是&quot;随时可丢弃&quot;的，所以不计入「已用」。</p>
+
+<h3>3.3 与「活动监视器」的对应关系</h3>
+
+<table>
+<tr><th>活动监视器</th><th>本面板</th></tr>
+<tr><td>应用内存</td><td>应用</td></tr>
+<tr><td>联动内存</td><td>联动</td></tr>
+<tr><td>已压缩</td><td>压缩</td></tr>
+<tr><td>已缓存文件</td><td>缓存</td></tr>
+<tr><td>已使用内存</td><td>应用 + 联动 + 压缩</td></tr>
+</table>
+
+<h3>3.4 压缩的两个数字</h3>
+
+<p>`vm_stat` 里有两个容易混淆的字段：</p>
+
+<pre><code>
+Pages stored in compressor:      689716   ← 压缩前的原始数据量
+Pages occupied by compressor:    286102   ← 压缩后实际占用
+</code></pre>
+
+<p>面板显示的是**后者**（真实占用）。前者除以后者就是压缩率，本机实测约 **2.4 倍**：</p>
+
+<pre><code>
+689716 × 16KB ≈ 10.5 GB 原始数据
+286102 × 16KB ≈  4.4 GB 实际占用
+</code></pre>
+
+<p>所以「压缩 4.9 GB」不代表只用了 4.9 GB，它装着的原始数据接近 11 GB。</p>
+
+<h3>3.5 为什么「已用」不会超过物理内存</h3>
+
+<p>应用 + 联动 + 压缩三者都实打实占着物理页，所以它们的和天然 ≤ 总内存。超出物理内存的需求不会体现在这个数字上，而是变成**交换**。</p>
+
+<p>---</p>
+
+<h2>4. 交换</h2>
+
+<pre><code>
+sysctl vm.swapusage   →   struct xsw_usage
+</code></pre>
+
+<table>
+<tr><th>字段</th><th>含义</th></tr>
+<tr><td>`xsu_total`</td><td>系统当前**已创建**的交换文件总容量</td></tr>
+<tr><td>`xsu_used`</td><td>已写入的量</td></tr>
+</table>
+
+<p>**`xsu_total` 不是上限，也不是建议值。** macOS 的 `dynamic_pager` 按需创建交换文件（`swapfile0`、`swapfile1`……），不够就再建一个。真正的边界是磁盘剩余空间。</p>
+
+<p>因此面板只显示 `xsu_used`，总量放进悬停提示——写成「已用 / 总量」会让人误读成&quot;快满了&quot;。</p>
+
+<p>---</p>
+
+<h2>5. 网络</h2>
+
+<pre><code>
+sysctl(CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0)
+</code></pre>
+
+<p>返回一串 `if_msghdr2`，其中 `ifm_data` 是 `if_data64`，含 64 位累计字节数。</p>
+
+<p>**只统计 `en*`（以太网 / Wi-Fi）和 `pdp_ip*`（蜂窝）**，避免 VPN 隧道（`utun*`）与物理网卡重复计数。</p>
+
+<h3>坑：实际只有低 32 位</h3>
+
+<p>实测本机 en1：</p>
+
+<table>
+<tr><th>来源</th><th>Ibytes</th></tr>
+<tr><td>`netstat -ibn`</td><td>21,929,251,512</td></tr>
+<tr><td>`NET_RT_IFLIST2`</td><td>384,832,512</td></tr>
+</table>
+
+<p>后者恰好等于前者 `mod 2³²`。用 C 重写同样逻辑，结果一致——确认是内核侧行为，不是 Swift 结构体绑定问题。</p>
+
+<p>后果：计数器每 4 GB 翻转一次。若直接做 64 位减法，高速下载时会周期性产生天文数字的速率尖峰。所以差值必须按 32 位回绕处理：</p>
+
+<pre><code>
+let delta = (current &amp;- previous) &amp; 0xFFFF_FFFF
+</code></pre>
+
+<p>对真实 64 位计数器同样安全——1 秒内不可能流过 4 GB。</p>
+
+<p>验证：`curl` 自报 4.47 MB/s，`netstat` 同窗口 4.69 MB/s，采样值 3.6–5.5 MB/s。</p>
+
+<p>---</p>
+
+<h2>6. 磁盘</h2>
+
+<h3>容量</h3>
+
+<pre><code>
+statfs(&quot;/&quot;, &amp;stats)
+total     = f_blocks × f_bsize
+available = f_bavail × f_bsize
+</code></pre>
+
+<h3>读写速率</h3>
+
+<pre><code>
+IOServiceMatching(&quot;IOBlockStorageDriver&quot;)
+→ IORegistryEntryCreateCFProperty(entry, &quot;Statistics&quot;, ...)
+</code></pre>
+
+<p>取 `Statistics[&quot;Bytes (Read)&quot;]` / `[&quot;Bytes (Write)&quot;]`（64 位，无需 root），对多个块设备求和后差分。</p>
+
+<p>---</p>
+
+<h2>7. GPU</h2>
+
+<pre><code>
+IOServiceMatching(&quot;IOAccelerator&quot;)
+→ &quot;PerformanceStatistics&quot;[&quot;Device Utilization %&quot;]
+</code></pre>
+
+<p>多个加速器时取最大值，归一化到 0–1。</p>
+
+<p>特点：**Apple Silicon 上无需 root**。局限：不提供显存占用、频率、温度；Intel 机器上部分字段可能缺失，缺失时显示「不可用」。</p>
+
+<p>---</p>
+
+<h2>8. 进程</h2>
+
+<h3>8.1 枚举与归并</h3>
+
+<ul><li>`NSWorkspace.shared.runningApplications` → 取 `activationPolicy == .regular` 的 App（有 Dock 图标的）</li>
+<li>`proc_listallpids` → 拿到所有 pid</li>
+<li>每个 pid 调 `proc_pidpath` 取可执行文件路径</li>
+<li>路径以某个 App 的 `bundleURL.path + &quot;/&quot;` 开头 → 归入该 App</li>
+</ul>
+<p>**为什么必须归并**：Chrome、Edge、Steam、VSCode 这类应用的负载几乎全在 Helper 子进程里，主进程常年 0%。只统计主进程会得出完全错误的结论。</p>
+
+<p>Steam 的实际分布（本机实测 10 个进程）：</p>
+
+<table>
+<tr><th>进程</th><th>数量</th></tr>
+<tr><td>`steam_osx`</td><td>1</td></tr>
+<tr><td>`ipcserver`</td><td>1</td></tr>
+<tr><td>`Steam Helper`</td><td>8</td></tr>
+</table>
+
+<h3>8.2 CPU 百分比</h3>
+
+<pre><code>
+proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &amp;info, sizeof(info))
+</code></pre>
+
+<p>拿到 `pti_total_user` / `pti_total_system`。</p>
+
+<p>**单位是 mach 绝对时钟 tick，不是纳秒。** Apple Silicon 上是 24 MHz，必须换算：</p>
+
+<pre><code>
+var tb = mach_timebase_info_data_t()
+mach_timebase_info(&amp;tb)
+let seconds = Double(ticks) * Double(tb.numer) / Double(tb.denom) / 1e9
+</code></pre>
+
+<p>&gt; 直接当纳秒用会低估约 **41.7 倍**。实测：单线程满载 2 秒 = 46,568,981 tick，</p>
+<p>&gt; 46,568,981 ÷ 24e6 = 1.94 秒，与墙钟吻合。</p>
+
+<p>然后：</p>
+
+<pre><code>
+usage = Σ(Δuser + Δsystem) / 墙钟间隔
+</code></pre>
+
+<p>**单位是「核」**：`1.0 = 100% = 吃满一个核心`。多线程应用会超过 100%，10 核机器理论上限 1000%。</p>
+
+<h3>8.3 内存</h3>
+
+<p>`pti_resident_size`（RSS）按 App 求和。</p>
+
+<p>**偏差**：多个进程共享同一批系统库，RSS 求和会把这些共享页重复计算多次，所以比「活动监视器」的物理占用偏高。这是 RSS 口径的固有特性，不是 bug。</p>
+
+<h3>8.4 沙盒限制</h3>
+
+<p>App Sandbox 下 `proc_pidpath` / `proc_pidinfo` 对非自身进程返回 `EPERM`，进程列表整体失效。当前版本是无沙盒构建；上架版本需要把这个模块关掉。</p>
+
+<p>---</p>
+
+<h2>9. 阈值与配色</h2>
+
+<table>
+<tr><th>对象</th><th>规则</th></tr>
+<tr><td>内存「交换」</td><td>&lt; 256 MB 灰；≥ 256 MB 黄；≥ 1 GB 红</td></tr>
+<tr><td>内存压力徽标</td><td>正常 / 偏高 / 严重（`kern.memorystatus_vm_pressure_level` = 1 / 2 / 4）</td></tr>
+<tr><td>进程 CPU</td><td>占整机 &lt; 30% 白；30–60% 黄；&gt; 60% 红</td></tr>
+<tr><td>顶部状态圆点</td><td>取内存告警与压力的最高等级</td></tr>
+</table>
+
+<p>进程 CPU 的颜色按**占整机比例**判断，不是按「吃了几个核」。100% 在 10 核机器上只占整机 10%，标红会误导用户。</p>
+
+<p>---</p>
+
+<h2>10. 已知偏差与限制</h2>
+
+<ul><li>**进程内存偏高**：RSS 求和重复计算共享库（见 8.3）。</li>
+<li>**只统计有 Dock 图标的 App**：纯后台的辅助进程不单独列出。</li>
+<li>**网络不含 VPN 隧道**：只算物理网卡，`utun*` 不计。</li>
+<li>**无温度 / 风扇 / 功耗**：需要 root 或 SMC 访问，当前不做。</li>
+<li>**GPU 字段依赖 IOKit 私有属性名**：`Device Utilization %` 未公开承诺，未来系统版本可能变化，找不到时显示「不可用」。</li>
+<li>**APFS 容量**：`statfs` 返回的是容器层面的数字，与其他卷共享空间，可能与本卷实际可用略有差异。</li>
+<li>**核心 P/E 顺序**：基于本机实测（M4）。跨代芯片未逐一验证，代码在数量不匹配时会退化为单色显示。</li>
+</ul>
+<p>---</p>
+
+<h2>11. 自检命令</h2>
+
+<pre><code>
+# 采样自检：打印 CPU / 内存 / 网络 / 磁盘 / GPU 读数
+./.build/release/DeskMonitor --probe
+
+# 性能基准：各采样器单次耗时
+./.build/release/DeskMonitor --bench
+
+# 离屏渲染界面（用于截图、对比配色）
+./.build/release/DeskMonitor --render shots/panel.png
+./.build/release/DeskMonitor --render shots/panel-warning.png --warn
+</code></pre>
+</body></html>

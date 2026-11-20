@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>DeskMonitor 使用说明</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 15.5px;
+    line-height: 1.9;
+    color: #1f2328;
+    margin: 0;
+    padding: 0 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .cover { padding: 8px 0 4px; border-bottom: 3px solid #1f6feb; margin-bottom: 26px; }
+  .cover h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: 0.5px; }
+  .cover p { margin: 0 0 4px; color: #57606a; font-size: 14px; }
+
+  h2 {
+    font-size: 20px;
+    margin: 34px 0 12px;
+    padding: 6px 0 6px 12px;
+    border-left: 5px solid #1f6feb;
+    background: linear-gradient(90deg, #eef4ff 0%, #ffffff 70%);
+    page-break-after: avoid;
+  }
+
+  h3 { font-size: 16.5px; margin: 22px 0 8px; color: #0b4f9e; page-break-after: avoid; }
+
+  p { margin: 10px 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14.5px;
+  }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  th {
+    background: #eef2f7;
+    text-align: left;
+    padding: 9px 11px;
+    border: 1px solid #d5dde6;
+    font-weight: 600;
+  }
+  td {
+    padding: 9px 11px;
+    border: 1px solid #d5dde6;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #fafcfe; }
+
+  .tip, .note, .warn {
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 6px;
+    font-size: 14.5px;
+    page-break-inside: avoid;
+  }
+  .tip  { background: #eef6ff; border-left: 4px solid #3aa0ff; }
+  .note { background: #f6f8fa; border-left: 4px solid #8b949e; }
+  .warn { background: #fff8e6; border-left: 4px solid #e8a317; }
+
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+
+  code {
+    font-family: "SF Mono", Menlo, monospace;
+    background: #f2f4f7;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 13.5px;
+  }
+
+  .big { font-size: 17px; font-weight: 600; }
+
+  ul, ol { margin: 10px 0; padding-left: 26px; }
+  li { margin: 6px 0; }
+
+  .toc { background: #f8fafc; border: 1px solid #e3e9f0; border-radius: 8px; padding: 14px 20px; margin: 20px 0; }
+  .toc ol { margin: 6px 0; }
+  .toc li { margin: 4px 0; }
+
+  .quote-final {
+    background: linear-gradient(135deg, #1f6feb 0%, #1653b8 100%);
+    color: #fff;
+    padding: 20px 24px;
+    border-radius: 10px;
+    font-size: 17px;
+    line-height: 1.8;
+    margin: 26px 0 10px;
+    page-break-inside: avoid;
+  }
+  .quote-final strong { font-size: 19px; }
+
+  .page-break { page-break-before: always; }
+
+  .shot {
+    margin: 16px 0;
+    text-align: center;
+    page-break-inside: avoid;
+  }
+  .shot img {
+    width: 160px;
+    border-radius: 10px;
+    /* 不要用 box-shadow：PDF 渲染会把模糊阴影画成灰色实心块 */
+    border: 1px solid #e1e4e8;
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>DeskMonitor 使用说明</h1>
+  <p>写给不需要懂电脑的人 · 全程不用术语，看不懂的地方可以直接跳过</p>
+</div>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li>这是什么东西</li>
+    <li>怎么用（含：怎么关掉不需要的部分）</li>
+    <li>面板一共分几块（含时间与天气）</li>
+    <li>CPU：大脑有多忙（含柱状图）</li>
+    <li>内存：操作台有多大</li>
+    <li>网络 / 磁盘 / GPU</li>
+    <li>进程：谁在吃资源</li>
+    <li>什么时候该管，什么时候不用管</li>
+    <li>三个最常见的误解</li>
+  </ol>
+</div>
+
+<h2>一、这是什么东西</h2>
+
+<p>想象你的电脑是一间<strong>厨房</strong>。</p>
+
+<p>这个小面板就是厨房门口的<strong>仪表盘</strong>：告诉你现在有几个灶眼在开火、操作台上摆了多少东西、地下仓库有没有开始存货。</p>
+
+<div class="tip">
+  <strong>它只看，不动。</strong>关掉它、删掉它，对电脑毫无影响。它不会让你的电脑变快，也不会变慢。
+</div>
+
+<h2>二、怎么用</h2>
+
+<table>
+  <tr><th style="width:42%">你想做的事</th><th>怎么做</th></tr>
+  <tr><td>让它消失一会儿</td><td>点一下屏幕最上方菜单栏里的数字</td></tr>
+  <tr><td>让它回来</td><td>再点一下</td></tr>
+  <tr><td>挪到别的位置</td><td>按住面板<strong>最上面那一行</strong>拖动（完整版是「DeskMonitor」标题行，简约模式是时间那一行）</td></tr>
+  <tr><td>调整外观、刷新快慢</td><td>在菜单栏图标上<strong>右键</strong></td></tr>
+  <tr><td>让它别挡住点击</td><td>右键 → 打开「点击穿透」（想关掉时再右键一次）</td></tr>
+  <tr><td>只保留 CPU 和内存</td><td>右键 → 显示模块 → 关掉不需要的几项</td></tr>
+  <tr><td>让它变得很小</td><td>右键 → 简约模式</td></tr>
+  <tr><td>改天气显示的城市</td><td>右键 → 设置城市…，输入城市名</td></tr>
+  <tr><td>让它开机自己启动</td><td>右键 → 打开「开机自启」</td></tr>
+  <tr><td>彻底关掉</td><td>右键 → 退出 DeskMonitor</td></tr>
+</table>
+
+<p>菜单栏图标长这样：<code>24%&nbsp;&nbsp;9.4G</code>，前面是 CPU，后面是内存。</p>
+
+<div class="note">
+  <strong>拖不丢。</strong>如果不小心把面板拖到屏幕边缘之外，松手后它会自己回到可见范围内。
+  换显示器、改分辨率之后也一样。
+</div>
+
+<h3>简约模式：一个方块</h3>
+
+<p>如果觉得面板太占地方，打开<strong>简约模式</strong>，它会变成一个方块：</p>
+
+<div class="shot">
+  <img src="compact-shot.png" alt="简约模式实际样子">
+</div>
+
+<p>里面只有三样东西：<strong>时间、CPU、内存</strong>。</p>
+
+<ul>
+  <li><strong>没有进度条</strong>——方块太小，条短到看不出比例，反而是噪音</li>
+  <li><strong>没有日期和天气</strong>——它们属于额外信息，想要就看完整版</li>
+  <li>整个方块都能拖动</li>
+  <li>鼠标停上去能看到细节：CPU 的用户/系统占比，内存的已用/压力/交换</li>
+</ul>
+
+<p>尺寸 <strong>104 × 104</strong>，完整版是 296 × 535——面积不到<strong>十五分之一</strong>。
+想切回来，右键 → 简约模式，再点一次。</p>
+
+<div class="tip">
+  <strong>菜单会跟着变。</strong>简约模式下，右键菜单里那些在当前布局不生效的选项
+  （时间天气、网络、磁盘、GPU、进程、设置城市）会<strong>自动变灰</strong>，
+  不会留下「勾了却没有任何反应」的假开关。切回完整版就全部恢复。
+</div>
+
+<div class="note">
+  <strong>告警不会丢。</strong>内存的数字和左侧圆点会跟着交换量变色：
+  交换超过 256 MB 变黄、超过 1 GB 变红，和完整版一致。
+</div>
+
+<div class="tip">
+  <strong>面板可以变短，最短可以只剩一个时钟。</strong>
+  「显示模块」里<strong>每一项都能单独关掉</strong>——包括 CPU 和内存。
+  关掉后窗口会自动缩小、位置不变、设置会记住。
+</div>
+
+<table>
+  <tr><th style="width:52%">你关掉了什么</th><th>面板尺寸（宽 × 高）</th></tr>
+  <tr><td>什么都不关</td><td>296 × 535 起</td></tr>
+  <tr><td>只留时钟 + CPU + 内存</td><td>296 × 约 327</td></tr>
+  <tr><td><strong>简约模式</strong></td><td><strong>104 × 104</strong></td></tr>
+  <tr><td>只留时钟（当桌面时钟用）</td><td>296 × 约 57</td></tr>
+</table>
+
+<p style="font-size:13px; color:#57606a;">
+  高度会随内容变化：CPU 核心越多、进程列表行数不同、任务卡片有无，都会让数字略有出入。
+</p>
+
+<h2>三、面板一共分几块</h2>
+
+<p>从上到下，依次是：<strong>时间天气 → CPU → 内存 → 网络/磁盘/GPU → 进程</strong>。下面一块一块讲。</p>
+
+<h3>最上面一行：时间和天气</h3>
+
+<p>左边是当前时间，中间是日期和星期，右边是天气：图标 + 天气情况 + 温度。</p>
+
+<pre>17:00   11月17日 周二                 ☁ 阴 16°</pre>
+
+<p>天气默认按你所在时区猜一个城市（比如「Asia/Shanghai」会猜成上海）。</p>
+
+<div class="warn">
+  <strong>猜得不对怎么办？</strong>右键 → 设置城市… → 输入「北京」「广州」这样的名字即可。
+  城市只需要设置一次，之后会记住。
+</div>
+
+<div class="note">
+  <strong>关于隐私：</strong>天气数据来自 Open-Meteo（一个免费的公开天气服务），
+  每 15 分钟更新一次。它只会收到<strong>你设置的城市中心的经纬度</strong>，
+  不包含任何设备信息、账号或位置追踪。不想要天气，可以在「显示模块」里关掉。
+</div>
+
+<h2>四、CPU（大脑有多忙）</h2>
+
+<h3>大数字 43%</h3>
+
+<p>整台电脑<strong>平均</strong>的忙碌程度。可以理解成「平均每个灶眼开了 43% 的火」。</p>
+
+<table>
+  <tr><th style="width:30%">数值</th><th>状态</th></tr>
+  <tr><td>30% 以下</td><td>很轻松</td></tr>
+  <tr><td>30% – 70%</td><td>正常干活</td></tr>
+  <tr><td>80% 以上且持续很久</td><td>有点累，可能会卡</td></tr>
+</table>
+
+<h3>折线图</h3>
+
+<p>过去<strong>两分钟</strong>的忙碌变化，线越高越忙。</p>
+
+<p>它的作用不是看「现在多少」，而是看<strong>趋势</strong>——是平稳，还是突然窜起来又掉下去。</p>
+
+<h3>柱状图（10 根柱子）</h3>
+
+<p><strong>每一根柱子 = 电脑里一个「灶眼」（核心）。</strong>柱子越高，说明那个核心此刻越忙。</p>
+
+<pre>高高的柱子  ██  →  这个核心在满负荷干活
+矮矮的柱子  ▁▁  →  这个核心几乎闲着</pre>
+
+<p><strong>柱子下面有编号 1、2、3 … 10</strong>，就是核心的编号，方便对号入座。</p>
+
+<h3>为什么有亮、暗两种颜色</h3>
+
+<p>这 10 个核不是一样的，分两类：</p>
+
+<table>
+  <tr><th>颜色</th><th>编号</th><th>名称</th><th>通俗说法</th></tr>
+  <tr><td>亮色</td><td>7 – 10</td><td>性能核 P</td><td>大火灶：干活快、费电。重活优先给它</td></tr>
+  <tr><td>暗色</td><td>1 – 6</td><td>能效核 E</td><td>小火灶：慢一些但省电。轻活、后台任务用它</td></tr>
+</table>
+
+<p>面板右上角那个 <strong>4P + 6E</strong> 说的就是这个：</p>
+
+<ul>
+  <li><strong>P = Performance（性能核）</strong>，有 <strong>4</strong> 个</li>
+  <li><strong>E = Efficiency（能效核）</strong>，有 <strong>6</strong> 个</li>
+</ul>
+
+<p>合起来 10 个，正好对应下面 10 根柱子。</p>
+
+<pre>柱子:   1   2   3   4   5   6 │ 7   8   9   10
+        └───── 能效核 E ─────┘ └─ 性能核 P ─┘
+颜色:        暗色（省电）          亮色（快）</pre>
+
+<div class="note">
+  <strong>为什么性能核排在后面？</strong><br>
+  这是系统给核心编号的顺序，不是随便定的。实测验证过：同时跑 4 个单线程满载任务，
+  只有最后 4 根柱子（7–10）会到 100%。
+</div>
+
+<div class="note">
+  <strong>为什么有的柱子几乎不动？</strong><br>
+  因为那个核心确实闲着。10 个核不等于 10 个都在干活，系统会按需唤醒。
+  平时大部分工作由能效核（1–6）承担，性能核睡着，这样省电。
+</div>
+
+<h3>下面的小字：用户 / 系统 / 空闲</h3>
+
+<ul>
+  <li><strong>用户</strong>：你打开的软件在干活（浏览器、微信、剪视频）</li>
+  <li><strong>系统</strong>：电脑自己在干活（读硬盘、显示画面、管网络）</li>
+  <li><strong>空闲</strong>：完全没事干的部分</li>
+</ul>
+
+<p>三者加起来是 100%。</p>
+
+<h2>五、内存（操作台有多大）</h2>
+
+<p>还是用厨房比喻：<strong>内存 = 操作台的面积</strong>。台面越大，能同时摊开的菜越多。这台电脑是 <strong>16 GB</strong>。</p>
+
+<h3>大数字 9.5 GB / 16 GB</h3>
+
+<p>已经在用的台面 / 总台面。</p>
+
+<h3>彩色条：四种颜色各是什么</h3>
+
+<table>
+  <tr><th>颜色</th><th>名称</th><th>通俗解释</th></tr>
+  <tr><td>紫色</td><td><strong>应用</strong></td><td>正在做的菜——各个软件实际占的地方</td></tr>
+  <tr><td>橙色</td><td><strong>联动</strong></td><td>钉死在台面上的设备，搬不走。系统和显卡占的，永远不能挪</td></tr>
+  <tr><td>粉色</td><td><strong>压缩</strong></td><td>把暂时不用的菜<strong>打包压紧</strong>，占的地方变小</td></tr>
+  <tr><td>灰色</td><td><strong>缓存</strong></td><td>旁边备着的食材。<strong>随时可以扔掉</strong>，不算真占用</td></tr>
+</table>
+
+<div class="warn">
+  <strong>关键理解：</strong>粉色不是「浪费」。它是电脑在省地方——把暂时不用的东西压紧，
+  比搬到仓库（硬盘）快得多。所以看到粉色一大片不用紧张。
+</div>
+
+<h3>交换：未启用</h3>
+
+<p><strong>交换 = 把东西搬到地下仓库。</strong>操作台放不下了，电脑就把一些东西搬到硬盘上（仓库）。问题是：<strong>跑去仓库拿东西很慢</strong>，所以一旦动用交换，电脑就会开始卡。</p>
+
+<table>
+  <tr><th style="width:40%">显示</th><th>意味着</th></tr>
+  <tr><td>「未启用」</td><td>从来没搬过，状态很好</td></tr>
+  <tr><td>几百 KB ～ 几十 MB</td><td>偶尔搬了一点，不用管</td></tr>
+  <tr><td>超过 256 MB</td><td>开始变<strong>黄</strong>，注意了</td></tr>
+  <tr><td>超过 1 GB</td><td>变<strong>红</strong>，是真不够用了</td></tr>
+</table>
+
+<div class="note">
+  <strong>面板上只显示「已经搬了多少」，不显示「仓库有多大」。</strong><br>
+  因为仓库是电脑自己按需扩建的——不够就再建一个，没有固定上限，真正能拦住它的只有硬盘剩余空间。
+  所以那不是「限制」，也不是「建议值」。想知道系统目前分配了多少，把鼠标停在「交换」上就能看到。
+</div>
+
+<h3>压力徽标：正常</h3>
+
+<p>电脑自己判断的「挤不挤」：<strong>正常（绿）→ 偏高（黄）→ 严重（红）</strong>。</p>
+
+<p>这个比数字更直观：数字高不一定挤（因为有缓存和压缩），但压力变黄变红就一定是真挤了。</p>
+
+<h2>六、网络 / 磁盘 / GPU</h2>
+
+<table>
+  <tr><th style="width:20%">这一行</th><th style="width:34%">什么意思</th><th>怎么看</th></tr>
+  <tr><td><strong>网络</strong> ↓ ↑</td><td>下载和上传速度</td><td>看视频卡不卡、下载跑满没有</td></tr>
+  <tr><td><strong>磁盘</strong> 读 写</td><td>硬盘读写的速度</td><td>拷贝大文件、装软件时会涨</td></tr>
+  <tr><td><strong>GPU</strong></td><td>显卡的忙碌程度</td><td>玩游戏、剪视频、跑 AI 时会涨</td></tr>
+  <tr><td><strong>剩余</strong></td><td>硬盘还剩多少空间</td><td>低于 10% 该清理了</td></tr>
+</table>
+
+<p>右边的两条小曲线，是过去两分钟的走势。</p>
+
+<h2>七、进程（谁在吃资源）</h2>
+
+<p>这里列出<strong>当前开着的软件</strong>，各自吃多少。</p>
+
+<pre>🍎 微信  ×14     4%    342M</pre>
+
+<h3>名字后面的 ×14 是什么</h3>
+
+<p>这个软件其实开了 14 个进程，这一行的数字是它们<strong>加起来</strong>的。</p>
+
+<p>拿 Steam 举例，它的 10 个进程是这样分工的：</p>
+
+<table>
+  <tr><th>进程</th><th style="width:18%">数量</th><th>干什么的</th></tr>
+  <tr><td><code>steam_osx</code></td><td>1</td><td>主程序，就是看到的那个窗口</td></tr>
+  <tr><td><code>ipcserver</code></td><td>1</td><td>内部通信</td></tr>
+  <tr><td><code>Steam Helper</code></td><td>8</td><td>网络、画面、声音、崩溃上报等</td></tr>
+</table>
+
+<p>浏览器更夸张，一个标签页可能就是一个进程。所以 ×14 的微信并不是「开了 14 个微信」，而是<strong>一个微信拆成 14 份在跑</strong>——这是现代软件的常规做法，好处是某一份崩了不会拖垮全部。</p>
+
+<h3>CPU 显示 100% 是什么意思</h3>
+
+<div class="warn">
+  <strong>这里的 100% = 吃满「一个」核心，不是吃满整台电脑。</strong>
+</div>
+
+<p>这台电脑有 10 个核心，所以：</p>
+
+<pre>100%  =  1 个核心全速  =  只占整台电脑的 10%
+400%  =  4 个核心全速  =  占整台电脑的 40%</pre>
+
+<p><strong>所以超过 100% 完全正常，也不是坏事。</strong></p>
+
+<p>它只说明一件事：<strong>这个软件在同时干好几件事</strong>（多线程）。比如微信一边收消息一边传文件，就会超过 100%。</p>
+
+<p>真正在干重活的软件会更高：</p>
+
+<table>
+  <tr><th style="width:50%">在做什么</th><th>常见数值</th></tr>
+  <tr><td>导出视频</td><td>500% – 800%</td></tr>
+  <tr><td>编译代码</td><td>700% – 900%</td></tr>
+  <tr><td>玩大型游戏</td><td>600% 以上</td></tr>
+</table>
+
+<p>这些都不是故障，是<strong>它该有的样子</strong>。</p>
+
+<h3>那什么时候才要担心</h3>
+
+<p>看<strong>颜色</strong>：</p>
+
+<table>
+  <tr><th style="width:20%">颜色</th><th>含义</th></tr>
+  <tr><td>白色</td><td>正常，占整机不到 30%</td></tr>
+  <tr><td>黄色</td><td>这个软件吃了整机 30% 以上，有点猛</td></tr>
+  <tr><td>红色</td><td>吃了整机 60% 以上，几乎把电脑占满了</td></tr>
+</table>
+
+<p><strong>红色才值得看。</strong>而且要看它是不是<strong>一直红</strong>：</p>
+
+<ul>
+  <li>导出视频时红 3 分钟，然后自己降下来 → 正常</li>
+  <li>一直红着、电脑发烫、风扇狂转、你也没在干什么 → 有问题，考虑关掉它</li>
+</ul>
+
+<h2>八、什么时候该管，什么时候不用管</h2>
+
+<table>
+  <tr><th style="width:36%">你看到的</th><th style="width:16%">是不是问题</th><th>该做什么</th></tr>
+  <tr><td>内存用了 90%</td><td>不是</td><td>灰色缓存会自己让出来，不用管</td></tr>
+  <tr><td>内存满了但交换是 0</td><td>不是</td><td>状态很好</td></tr>
+  <tr><td>交换变黄 / 红</td><td><strong>是</strong></td><td>关掉不用的软件（浏览器标签最吃内存）</td></tr>
+  <tr><td>压力显示「偏高 / 严重」</td><td><strong>是</strong></td><td>同上</td></tr>
+  <tr><td>某个软件 CPU 300%</td><td>通常不是</td><td>看它是不是在干正事（导出、编译、游戏）</td></tr>
+  <tr><td>某个软件 CPU 一直红</td><td>可能</td><td>电脑卡、发烫就关掉它</td></tr>
+  <tr><td>CPU 柱状图全都很高</td><td>看情况</td><td>短时间正常，长期这样会卡</td></tr>
+  <tr><td>硬盘剩余 &lt; 10%</td><td><strong>是</strong></td><td>清理空间，否则会明显变慢</td></tr>
+</table>
+
+<h2>九、三个最常见的误解</h2>
+
+<table>
+  <tr><th style="width:44%">误解</th><th>事实</th></tr>
+  <tr>
+    <td>「内存用满了就是坏了」</td>
+    <td>不。灰色缓存是「备用的食材」，系统随时能扔掉。真正该看的是<strong>交换</strong>和<strong>压力</strong>。</td>
+  </tr>
+  <tr>
+    <td>「交换一出现就是坏了」</td>
+    <td>不。几百 KB 是常态（系统会预先建好仓库）。持续增长、超过 256 MB 才值得注意。</td>
+  </tr>
+  <tr>
+    <td>「CPU 超过 100% 是故障」</td>
+    <td>不。100% = 一个核心。多核机器上，400% 只是「用了 4 个灶眼」，很正常。</td>
+  </tr>
+</table>
+
+<div class="quote-final">
+  <strong>一句话总结：看颜色，不看数字。</strong><br>
+  全绿、交换「未启用」→ 一切正常，不用管。<br>
+  出现黄 / 红 → 关掉不用的软件，通常立刻就好。
+</div>
+
+<p style="color:#8b949e; font-size:13px; margin-top:26px; border-top:1px solid #e1e4e8; padding-top:12px;">
+  想知道每个数字具体是怎么算出来的，请看《使用说明（进阶版）》。
+</p>
+
+</body>
+</html>

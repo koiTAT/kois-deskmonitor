@@ -1,0 +1,14 @@
+# 构建产物
+.build/
+build/
+DerivedData/
+*.app
+
+# 打包与临时文件
+*.zip
+*.xcarchive
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcworkspace

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  上架 App Store 时启用这个文件，并关掉其余「需要读取全系统」的功能。
+	  沙盒下系统级 CPU / 内存 / 磁盘 / 网络 仍然可读，
+	  但进程列表、SMC 温度风扇会被拒绝。
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+</dict>
+</plist>
